@@ -1,17 +1,17 @@
 import asyncio
 from typing import Optional, List
 from pydantic import BaseModel
-import requests
-from bs4 import BeautifulSoup
 from fastapi import FastAPI, Depends, HTTPException
 from sqlmodel import Field, Session, SQLModel, create_engine, select
 from starlette.concurrency import run_in_threadpool
+from parser import find_name_and_price
 
 app = FastAPI()
 
 sqlite_file_name = "prices.db"
 sqlite_url = f"sqlite:///{sqlite_file_name}"
 engine = create_engine(sqlite_url, echo=True)
+
 
 # Модель цены и названия кружки
 class Prices(SQLModel, table=True):
@@ -35,41 +35,6 @@ def create_db_and_tables():
 
 
 create_db_and_tables()
-
-
-# Функция для парсинга данных
-# парсит данные с сайта и возвращает список кортежей с названиями и ценами товаров.
-def find_name_and_price(base_url: str, start_path: str) -> List[tuple]:
-    """
-    Парсит данные с сайта и возвращает список кортежей с названиями и ценами товаров.
-
-    Args:
-        base_url (str): Основной URL сайта.
-        start_path (str): Путь до категории товаров.
-
-    Returns:
-        List[tuple]: Список кортежей с названиями и ценами товаров.
-    """
-    url = base_url + start_path
-    result = []
-    while url:
-        try:
-            response = requests.get(url, timeout=10)
-            response.raise_for_status()
-            soup = BeautifulSoup(response.content, "lxml")
-            articles = soup.find_all("article", class_="l-product")
-            for article in articles:
-                name = article.find("span", itemprop="name")
-                price = article.find("span", itemprop="price")
-                if name and price:
-                    result.append((name.text.strip(), int(price.text.strip())))
-
-            next_page = soup.find("a", id="navigation_2_next_page")
-            url = base_url + next_page["href"] if next_page else None
-        except Exception as e:
-            print(f"Error fetching data: {e}")
-            break
-    return result
 
 
 # URL сайта и путь до категории
